@@ -15,20 +15,22 @@ from .utils import combine_spectra
 
 class Visit:
 
-    def __init__(self, visit, make_plots=False):
+    def __init__(self, visit, sigma_clip_flux=True):
         self._visit_row = visit
         self._apid = self._visit_row['APOGEE_ID']
-        self.make_plots = make_plots
 
         self._visit_hdulist = None
         self._frames_hdulist = None
 
+        self.sigma_clip_flux = sigma_clip_flux
+
     def __getitem__(self, key):
-        if key in self._visit_row:
+        if key in self.colnames:
             return self._visit_row[key]
         else:
-            return super().__getitem__(key)
+            raise KeyError(f"Invalid key '{key}'")
 
+    @property
     def colnames(self):
         return self._visit_row.colnames
 
@@ -40,7 +42,8 @@ class Visit:
 
     @property
     def spectrum(self):
-        return get_visit_spectrum(self.hdulist)
+        return get_visit_spectrum(
+            self.hdulist, sigma_clip_flux=self.sigma_clip_flux)
 
     @property
     def frame_hdulists(self):
@@ -61,9 +64,11 @@ class Visit:
         for frame in flipped:
             chip_spectra = []
             for chip in flipped[frame]:
-                spec = get_frame_spectrum(flipped[frame][chip],
-                                          self._apid,
-                                          mask_flux=mask_flux)
+                spec = get_frame_spectrum(
+                    flipped[frame][chip],
+                    self._apid,
+                    mask_flux=mask_flux,
+                    sigma_clip_flux=self.sigma_clip_flux)
                 chip_spectra.append(spec)
 
             spectra[frame] = combine_spectra(*chip_spectra)

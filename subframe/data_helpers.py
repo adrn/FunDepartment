@@ -8,6 +8,7 @@ from collections import defaultdict
 # Third-party
 from astropy.io import fits
 from astropy.nddata import StdDevUncertainty
+from astropy.stats import sigma_clip
 import astropy.units as u
 import numpy as np
 import requests
@@ -117,15 +118,21 @@ def get_apCframes(visit):
     return hduls
 
 
-def get_visit_spectrum(hdul):
+def get_visit_spectrum(hdul, sigma_clip_flux=True):
     spectra = []
     for i in range(3):  # chips a, b, c
-        mask = (hdul[3].data[i] % 15) > 0
+        flux = hdul[1].data[i]
+        mask = ((hdul[3].data[i] % 15) > 0) & (flux > 0)
+
+        if sigma_clip_flux:
+            flux = sigma_clip(flux, sigma=5, masked=True)
+            mask &= flux.mask
+
         flux_err = hdul[2].data[i] * u.one
         unc = StdDevUncertainty(flux_err)
 
         s = Spectrum1D(
-            flux=hdul[1].data[i][~mask]*u.one,
+            flux=flux[~mask]*u.one,
             spectral_axis=hdul[4].data[i][~mask]*u.angstrom,
             uncertainty=unc[~mask])
 
@@ -135,13 +142,17 @@ def get_visit_spectrum(hdul):
     return spectrum
 
 
-def get_frame_spectrum(hdul, apogee_id, mask_flux=True):
+def get_frame_spectrum(hdul, apogee_id, mask_flux=True, sigma_clip_flux=True):
     object_idx, = np.where(hdul[11].data['OBJECT'] == apogee_id)[0]
 
     flux = hdul[1].data[object_idx]
     flux_err = hdul[2].data[object_idx]
     wvln = hdul[4].data[object_idx]
-    mask = (hdul[3].data[object_idx] % 15) > 0
+    mask = ((hdul[3].data[object_idx] % 15) > 0) & (flux <= 0)
+
+    if sigma_clip_flux:
+        flux = sigma_clip(flux, sigma=3, masked=True)
+        mask &= flux.mask
 
     if mask_flux:
         unc = StdDevUncertainty(flux_err[~mask])

@@ -1,6 +1,9 @@
 import numpy as np
 from astropy.nddata import StdDevUncertainty
+import astropy.units as u
 from specutils import Spectrum1D
+
+AA = u.angstrom
 
 
 def combine_spectra(*spectra):

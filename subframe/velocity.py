@@ -2,16 +2,13 @@
 
 # Third-party
 from astropy.constants import c as speed_of_light
-from astropy.stats import sigma_clip
 import astropy.units as u
 import numpy as np
 from scipy.interpolate import InterpolatedUnivariateSpline
 from specutils import Spectrum1D
 
 # This project
-# ...
-
-AA = u.angstrom
+from .utils import AA
 
 
 def doppler_factor(dv):
@@ -35,8 +32,7 @@ def shift_and_interpolate(ref_spectrum, dv, target_wavelength):
     return flux_interp(target_wavelength.to_value(AA))
 
 
-def normalize_ref_to_frame(frame_spectrum, ref_spectrum, deg=4,
-                           sigma_clip_flux=True):
+def normalize_ref_to_frame(frame_spectrum, ref_spectrum, deg=4):
     ref_flux_on_frame_grid = shift_and_interpolate(
         ref_spectrum, 0.*u.km/u.s, frame_spectrum.wavelength)
 
@@ -49,29 +45,8 @@ def normalize_ref_to_frame(frame_spectrum, ref_spectrum, deg=4,
              for i in range(deg+1)]
     M = np.stack(terms).T
 
-    if sigma_clip_flux:
-        clipped = sigma_clip(frame_spectrum.flux)
-        n_mask = clipped.mask.sum()
-        for n in range(1024):  # MAX ITER / infinity
-            Cinv = np.ones(len(wvln))
-            Cinv[clipped.mask] = 0.
-
-            coeffs = np.linalg.solve(((M.T * Cinv) @ M),
-                                     (M.T * Cinv) @ frame_spectrum.flux)
-            warped_flux = M @ coeffs
-
-            clipped = sigma_clip(warped_flux - frame_spectrum.flux, sigma=5)
-            if (clipped.mask.sum() - n_mask) < 4 and n > 2:
-                break
-
-            n_mask = clipped.mask.sum()
-
-        clip_mask = clipped.mask
-
-    else:
-        coeffs = np.linalg.solve(M.T @ M,
-                                 M.T @ frame_spectrum.flux)
-        clip_mask = None
+    coeffs = np.linalg.solve(M.T @ M,
+                             M.T @ frame_spectrum.flux)
 
     # Design matrix for (larger) apVisit spectrum
     d_wvln = ref_spectrum.wavelength.to_value(u.angstrom) - ref_wvln
@@ -82,7 +57,7 @@ def normalize_ref_to_frame(frame_spectrum, ref_spectrum, deg=4,
         M @ coeffs,
         spectral_axis=ref_spectrum.wavelength)
 
-    return normed_spectrum, clip_mask
+    return normed_spectrum
 
 
 def cross_correlate(frame_spectrum, normed_ref_spectrum,
