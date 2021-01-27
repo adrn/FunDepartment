@@ -17,6 +17,9 @@ ROOT_CACHE_PATH = pathlib.Path(
 cache_path = ROOT_CACHE_PATH / dr
 cache_path.mkdir(parents=True, exist_ok=True)
 
+plot_path = ROOT_CACHE_PATH / 'plots' / dr
+plot_path.mkdir(parents=True, exist_ok=True)
+
 # Load authentication for SDSS
 sdss_auth_file = pathlib.Path('~/.sdss.login').expanduser()
 if sdss_auth_file.exists():
