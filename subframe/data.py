@@ -15,12 +15,22 @@ from .utils import combine_spectra
 
 class Visit:
 
-    def __init__(self, visit):
+    def __init__(self, visit, make_plots=False):
         self._visit_row = visit
         self._apid = self._visit_row['APOGEE_ID']
+        self.make_plots = make_plots
 
         self._visit_hdulist = None
         self._frames_hdulist = None
+
+    def __getitem__(self, key):
+        if key in self._visit_row:
+            return self._visit_row[key]
+        else:
+            return super().__getitem__(key)
+
+    def colnames(self):
+        return self._visit_row.colnames
 
     @property
     def hdulist(self):
