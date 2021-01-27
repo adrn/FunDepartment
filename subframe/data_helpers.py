@@ -87,6 +87,9 @@ def get_apCframes(visit):
     frames = [int(visit_hdul[0].header[k]) for k in visit_hdul[0].header.keys()
               if k.startswith('FRAME')]
 
+    if len(frames) <= 1:
+        return None
+
     hduls = defaultdict(dict)
     for chip in ['a', 'b', 'c']:
         for frame in frames:

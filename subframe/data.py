@@ -23,11 +23,14 @@ class Visit:
         self._frames_hdulist = None
 
     @property
-    def spectrum(self):
+    def hdulist(self):
         if self._visit_hdulist is None:
             self._visit_hdulist = get_apVisit(self._visit_row)
+        return self._visit_hdulist
 
-        return get_visit_spectrum(self._visit_hdulist)
+    @property
+    def spectrum(self):
+        return get_visit_spectrum(self.hdulist)
 
     @property
     def frame_hdulists(self):
