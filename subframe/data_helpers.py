@@ -54,8 +54,12 @@ def get_apVisit(visit):
 
     local_file = local_path / filename
     if not local_file.exists():
-        logger.debug(f"downloading {filename}...")
+        logger.debug(f"downloading {url} ...")
         r = requests.get(url, auth=sdss_auth)
+
+        if not r.ok:
+            raise RuntimeError(f"Failed to download file from {url}: {r}")
+
         with open(local_file, 'wb') as f:
             f.write(r.content)
 
@@ -95,8 +99,13 @@ def get_apCframes(visit):
 
             local_file = local_path / filename
             if not local_file.exists():
-                logger.debug(f"downloading {filename}...")
+                logger.debug(f"downloading {url} ...")
                 r = requests.get(url, auth=sdss_auth)
+
+                if not r.ok:
+                    raise RuntimeError(
+                        f"Failed to download file from {url}: {r}")
+
                 with open(local_file, 'wb') as f:
                     f.write(r.content)
 
