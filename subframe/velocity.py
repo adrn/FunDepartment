@@ -103,7 +103,8 @@ def cross_correlate(frame_spectrum, normed_ref_spectrum,
     Cinv = 1 / frame_spectrum.uncertainty.array**2
     Cinv[clip_mask] = 0
 
-    denom = np.sqrt(np.diag((M.T * Cinv) @ M) * ((frame_spectrum.flux.T * Cinv) @ frame_spectrum.flux))
+    denom = np.sqrt(np.diag((M.T * Cinv) @ M) *
+                    ((frame_spectrum.flux.T * Cinv) @ frame_spectrum.flux))
     crosscorr = ((M.T * Cinv) @ frame_spectrum.flux) / denom
 
     return crosscorr, vs
