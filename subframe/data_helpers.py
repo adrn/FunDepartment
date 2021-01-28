@@ -170,13 +170,31 @@ def clean_spectrum(spectrum, percentile_clip=None):
     return spectrum
 
 
-def apply_mask(spectrum):
-    if spectrum.mask is None:
-        return spectrum
+def apply_masks(*spectra):
+    """
 
-    unc = StdDevUncertainty(spectrum.uncertainty.quantity[~spectrum.mask])
-    spectrum = Spectrum1D(
-        flux=spectrum.flux[~spectrum.mask],
-        spectral_axis=spectrum.wavelength[~spectrum.mask],
-        uncertainty=unc)
-    return spectrum
+    """
+
+    combined_mask = np.bitwise_or.reduce([
+        s.mask if s.mask is not None else False for s in spectra],
+        axis=0)
+
+    masked_spectra = []
+    for spectrum in spectra:
+        if spectrum.uncertainty is not None:
+            unc = StdDevUncertainty(
+                spectrum.uncertainty.quantity[~combined_mask])
+        else:
+            unc = None
+
+        spectrum = Spectrum1D(
+            flux=spectrum.flux[~combined_mask],
+            spectral_axis=spectrum.wavelength[~combined_mask],
+            uncertainty=unc)
+
+        if len(spectra) == 1:
+            return spectrum
+
+        masked_spectra.append(spectrum)
+
+    return masked_spectra

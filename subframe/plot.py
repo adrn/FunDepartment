@@ -7,7 +7,7 @@ import numpy as np
 # This project
 from .config import plot_path
 from .utils import AA
-from .data_helpers import apply_mask
+from .data_helpers import apply_masks
 
 FRAME_COLOR = 'tab:purple'
 VISIT_COLOR = 'k'
@@ -49,14 +49,14 @@ def plot_visit_frames(visit, masked=True, **kwargs):
 
     visit_spec = visit.get_spectrum()
     if masked:
-        visit_spec = apply_mask(visit_spec)
+        visit_spec = apply_masks(visit_spec)
     ax.plot(visit_spec.wavelength,
             visit_spec.flux / np.nanmedian(visit_spec.flux),
             color=VISIT_COLOR, **SPEC_STYLE)
 
     for i, (frame, s) in enumerate(spectra.items()):
         if masked:
-            s = apply_mask(s)
+            s = apply_masks(s)
         ax.plot(s.wavelength.value,
                 s.flux / np.nanmedian(s.flux) + i + 1,
                 color=FRAME_COLOR, **SPEC_STYLE)
