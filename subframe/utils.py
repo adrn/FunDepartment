@@ -47,6 +47,20 @@ def combine_spectra(*spectra):
 
 
 def parabola_optimum(x, y):
-    ps = np.polyfit(x, y, deg=2)
-    x0 = -ps[1] / (2*ps[0])
-    return x0, np.poly1d(ps)
+    ctr_i = np.argmax(y)
+    if ctr_i in [0, len(y)-1]:
+        # FAILURE
+        return np.nan, None
+
+    ps = np.polyfit(x[ctr_i-1:ctr_i+2],
+                    y[ctr_i-1:ctr_i+2],
+                    deg=2)
+    poly = np.poly1d(ps)
+
+    x0 = -ps[1] / (2 * ps[0])
+
+    if ps[0] > 0:
+        # FAILURE
+        return np.nan, poly
+
+    return x0, poly
