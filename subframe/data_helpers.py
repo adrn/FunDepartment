@@ -168,3 +168,15 @@ def clean_spectrum(spectrum, percentile_clip=None):
             mask=mask)
 
     return spectrum
+
+
+def apply_mask(spectrum):
+    if spectrum.mask is None:
+        return spectrum
+
+    unc = StdDevUncertainty(spectrum.uncertainty.quantity[~spectrum.mask])
+    spectrum = Spectrum1D(
+        flux=spectrum.flux[~spectrum.mask],
+        spectral_axis=spectrum.wavelength[~spectrum.mask],
+        uncertainty=unc)
+    return spectrum

@@ -7,6 +7,7 @@ import numpy as np
 # This project
 from .config import plot_path
 from .utils import AA
+from .data_helpers import apply_mask
 
 FRAME_COLOR = 'tab:purple'
 VISIT_COLOR = 'k'
@@ -40,17 +41,22 @@ def plot_spectrum_masked(spectrum):
     return fig
 
 
-def plot_visit_frames(visit):
-    spectra = visit.load_frame_spectra()
+def plot_visit_frames(visit, masked=True, **kwargs):
+    spectra = visit.get_frame_spectra(**kwargs)
 
     fig, ax = plt.subplots(1, 1, figsize=(12, 10),
                            constrained_layout=True)
 
-    ax.plot(visit.spectrum.wavelength,
-            visit.spectrum.flux / np.nanmedian(visit.spectrum.flux),
+    visit_spec = visit.get_spectrum()
+    if masked:
+        visit_spec = apply_mask(visit_spec)
+    ax.plot(visit_spec.wavelength,
+            visit_spec.flux / np.nanmedian(visit_spec.flux),
             color=VISIT_COLOR, **SPEC_STYLE)
 
     for i, (frame, s) in enumerate(spectra.items()):
+        if masked:
+            s = apply_mask(s)
         ax.plot(s.wavelength.value,
                 s.flux / np.nanmedian(s.flux) + i + 1,
                 color=FRAME_COLOR, **SPEC_STYLE)
@@ -58,9 +64,14 @@ def plot_visit_frames(visit):
 
     ax.yaxis.set_visible(False)
     ax.set_xlabel(f'wavelength [{AA:latex_inline}]')
-    ax.set_title(f"{visit['VISIT_ID'].strip()}")
+    ax.set_title(f"{visit['FILE'].strip()}")
 
-    filename = plot_path / f"{visit['APOGEE_ID']}/{visit['VISIT_ID']}-raw.png"
+    ax.set_xlim(visit_spec.wavelength.value.min(),
+                visit_spec.wavelength.value.max())
+
+    filename = (plot_path /
+                f"{visit['APOGEE_ID']}" /
+                f"{visit['FILE'][:-5].strip()}-frames-visit.png")
     return fig, filename
 
 
@@ -86,7 +97,7 @@ def plot_normalized_ref_spectrum(visit, frame_name,
             color=VISIT_COLOR, label='raw visit spectrum',
             **SPEC_STYLE)
     ax.legend(loc='lower left')
-    ax.set_title(f"{visit['VISIT_ID'].strip()}, frame={frame_name}")
+    ax.set_title(f"{visit['FILE'].strip()}, frame={frame_name}")
 
     ax = axes[1]
     ax.plot(normed_ref_spectrum.wavelength.to_value(AA),
@@ -97,6 +108,7 @@ def plot_normalized_ref_spectrum(visit, frame_name,
     ax.set_xlabel(f'wavelength [{AA:latex_inline}]')
 
     filename = (plot_path /
-                f"{visit['APOGEE_ID']}/{visit['VISIT_ID']}-{frame_name}.png")
+                f"{visit['APOGEE_ID']}" /
+                f"{visit['FILE'][:-5].strip()}-{frame_name}.png")
 
     return fig, filename

@@ -113,10 +113,9 @@ class Visit:
 
     @property
     def frame_times(self):
-        hduls = self.frame_hdulists['a']  # any chip - doesn't matter
-
         times = {}
-        for frame, hdul in hduls.items():
+        for frame, hduls in self.frame_hdulists.items():
+            hdul = hduls['a']  # any chip - doesn't matter
             times[frame] = Time(hdul[0].header['DATE-OBS'], scale='tai')
 
         return times
