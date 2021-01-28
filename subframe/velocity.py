@@ -10,6 +10,7 @@ from specutils import Spectrum1D
 
 # This project
 from .utils import AA
+from .log import logger
 
 
 def doppler_factor(dv):
@@ -33,9 +34,9 @@ def shift_and_interpolate(ref_spectrum, dv, target_wavelength):
     return flux_interp(target_wavelength.to_value(AA))
 
 
-def normalize_ref_to_frame(frame_spectrum, ref_spectrum, deg=4):
+def normalize_ref_to_frame(frame_spectrum, ref_spectrum, dv=0*u.km/u.s, deg=4):
     ref_flux_on_frame_grid = shift_and_interpolate(
-        ref_spectrum, 0.*u.km/u.s, frame_spectrum.wavelength)
+        ref_spectrum, dv, frame_spectrum.wavelength)
 
     wvln = frame_spectrum.wavelength.to_value(u.angstrom)
     ref_wvln = np.median(wvln)
@@ -48,6 +49,8 @@ def normalize_ref_to_frame(frame_spectrum, ref_spectrum, deg=4):
 
     coeffs = np.linalg.solve(M.T @ M,
                              M.T @ frame_spectrum.flux)
+    logger.debug('Normalize ref to frame - total sq. error ',
+                 np.linalg.norm((M @ coeffs) - frame_spectrum.flux)**2)
 
     # Design matrix for (larger) apVisit spectrum
     d_wvln = ref_spectrum.wavelength.to_value(u.angstrom) - ref_wvln

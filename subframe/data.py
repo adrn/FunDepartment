@@ -12,7 +12,8 @@ import numpy as np
 from specutils import Spectrum1D
 
 # This project
-from .data_helpers import get_apVisit, get_apCframes, clean_spectrum
+from .data_helpers import (get_apStar, get_apVisit, get_apCframes,
+                           clean_spectrum)
 from .utils import combine_spectra
 
 
@@ -69,7 +70,7 @@ class Visit:
         for i in range(3):  # chips a, b, c
             flux = hdul[1].data[i]
             flux_err = hdul[2].data[i] * u.one
-            mask = hdul[3].data[i] != 0
+            mask = (hdul[3].data[i] != 0) | np.isnan(flux)
             wvln = hdul[4].data[i]
 
             s = Spectrum1D(
@@ -82,6 +83,25 @@ class Visit:
         spectrum = combine_spectra(*spectra)
 
         return clean_spectrum(spectrum, percentile_clip=percentile_clip)
+
+    def get_apStar_spectrum(self, percentile_clip=True):
+        hdul = get_apStar(self)
+
+        i = 0
+        flux = hdul[1].data[i]
+        flux_err = hdul[2].data[i] * u.one
+        mask = (hdul[3].data[i] != 0) | np.isnan(flux)
+        wvln = 10 ** (hdul[0].header['CRVAL1'] +
+                      np.arange(hdul[1].header['NAXIS1']) *
+                      hdul[0].header['CDELT1'])
+
+        s = Spectrum1D(
+            flux=flux * u.one,
+            spectral_axis=wvln * u.angstrom,
+            uncertainty=StdDevUncertainty(flux_err),
+            mask=mask)
+
+        return clean_spectrum(s, percentile_clip=percentile_clip)
 
     def get_frame_spectra(self, percentile_clip=True):
         spectra = {}
@@ -96,7 +116,9 @@ class Visit:
                 flux = hdul[1].data[object_idx]
                 flux_err = hdul[2].data[object_idx]
                 wvln = hdul[4].data[object_idx]
-                mask = ((hdul[3].data[object_idx] != 0) | (flux <= 0))
+                mask = ((hdul[3].data[object_idx] != 0) |
+                        (flux <= 0) |
+                        np.isnan(flux))
 
                 s = Spectrum1D(
                     flux=flux * u.one,
