@@ -31,7 +31,8 @@ def plot_spectrum_masked(spectrum):
 
     ax.set_xlim(wvln.min(), wvln.max())
 
-    fmin, fmax = (flux[~spectrum.mask].min(), flux[~spectrum.mask].max())
+    fmin, fmax = (np.nanmin(flux[~spectrum.mask]),
+                  np.nanmax(flux[~spectrum.mask]))
     ptp = fmax - fmin
     ax.set_ylim(fmin - 0.2*ptp, fmax + 0.2*ptp)
 
