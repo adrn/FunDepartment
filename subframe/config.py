@@ -2,13 +2,18 @@ import os
 import pathlib
 
 
-allstar_path = pathlib.Path('~/data/APOGEE_DR16/allStar-r12-l33.fits')
+# allstar_path = pathlib.Path('~/data/APOGEE_DR16/allStar-r12-l33.fits')
+allstar_path = pathlib.Path('~/data/APOGEE_DR17/allStar-dr17-l33alpha.fits')
 allstar_path = allstar_path.expanduser()
 
-allvisit_path = pathlib.Path('~/data/APOGEE_DR16/allVisit-r12-l33.fits')
+# allvisit_path = pathlib.Path('~/data/APOGEE_DR16/allVisit-r12-l33.fits')
+allvisit_path = pathlib.Path('~/data/APOGEE_DR17/allVisit-dr17-l33alpha.fits')
 allvisit_path = allvisit_path.expanduser()
 
-dr = 'dr16'
+# dr = 'dr16'
+# reduction = 'r12'
+dr = 'dr17alpha'
+reduction = 'dr17'
 
 ROOT_CACHE_PATH = pathlib.Path(
     os.environ.get("APOGEE_CACHE_PATH",

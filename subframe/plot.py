@@ -13,6 +13,33 @@ VISIT_COLOR = 'k'
 SPEC_STYLE = dict(marker='', ls='-', lw=1, drawstyle='steps-mid')
 
 
+def plot_spectrum_masked(spectrum):
+    fig, ax = plt.subplots(1, 1, figsize=(12, 4))
+
+    wvln = spectrum.wavelength.to_value(AA)
+    flux = spectrum.flux.value
+
+    ax.plot(wvln[~spectrum.mask],
+            flux[~spectrum.mask],
+            **SPEC_STYLE)
+
+    ax.plot(wvln[spectrum.mask],
+            flux[spectrum.mask],
+            marker='o', mew=0, ms=2., ls='none',
+            color='tab:red', alpha=0.75, zorder=-10)
+
+    ax.set_xlim(wvln.min(), wvln.max())
+
+    fmin, fmax = (flux[~spectrum.mask].min(), flux[~spectrum.mask].max())
+    ptp = fmax - fmin
+    ax.set_ylim(fmin - 0.2*ptp, fmax + 0.2*ptp)
+
+    ax.set_xlabel(f'wavelength [{AA:latex_inline}]')
+    ax.set_ylabel('flux')
+
+    return fig
+
+
 def plot_visit_frames(visit):
     spectra = visit.load_frame_spectra()
 
@@ -30,7 +57,7 @@ def plot_visit_frames(visit):
         ax.text(s.wavelength.value.min(), 2+i+0.1, str(frame))
 
     ax.yaxis.set_visible(False)
-    ax.set_xlabel(f'wavelenth [{AA:latex_inline}]')
+    ax.set_xlabel(f'wavelength [{AA:latex_inline}]')
     ax.set_title(f"{visit['VISIT_ID'].strip()}")
 
     filename = plot_path / f"{visit['APOGEE_ID']}/{visit['VISIT_ID']}-raw.png"

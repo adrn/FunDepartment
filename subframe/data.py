@@ -2,14 +2,17 @@
 Utilities for downloading, caching, loading APOGEE data
 """
 # Standard library
-from collections import defaultdict
 
 # Third-party
+import astropy.coordinates as coord
+from astropy.nddata import StdDevUncertainty
 from astropy.time import Time
+import astropy.units as u
+import numpy as np
+from specutils import Spectrum1D
 
 # This project
-from .data_helpers import (get_apVisit, get_apCframes,
-                           get_visit_spectrum, get_frame_spectrum)
+from .data_helpers import get_apVisit, get_apCframes, clean_spectrum
 from .utils import combine_spectra
 
 
@@ -41,9 +44,17 @@ class Visit:
         return self._visit_hdulist
 
     @property
-    def spectrum(self):
-        return get_visit_spectrum(
-            self.hdulist, sigma_clip_flux=self.sigma_clip_flux)
+    def earth_location(self):
+        if self['TELESCOPE'] == 'apo25m':
+            return coord.EarthLocation.of_site('APO')
+        elif self['TELESCOPE'] == 'lco25m':
+            return coord.EarthLocation.of_site('LCO')
+        else:
+            raise NotImplementedError()
+
+    @property
+    def skycoord(self):
+        return coord.SkyCoord(self['RA'], self['DEC'], unit='deg')
 
     @property
     def frame_hdulists(self):
@@ -51,27 +62,52 @@ class Visit:
             self._frames_hdulist = get_apCframes(self._visit_row)
         return self._frames_hdulist
 
-    def load_frame_spectra(self, stitch=True, mask_flux=True):
-        if stitch is False:
-            raise NotImplementedError()
+    def get_spectrum(self, percentile_clip=True):
+        hdul = self.hdulist
 
-        flipped = defaultdict(dict)
-        for key, val in self.frame_hdulists.items():
-            for subkey, subval in val.items():
-                flipped[subkey][key] = subval
+        spectra = []
+        for i in range(3):  # chips a, b, c
+            flux = hdul[1].data[i]
+            flux_err = hdul[2].data[i] * u.one
+            mask = hdul[3].data[i] != 0
+            wvln = hdul[4].data[i]
 
+            s = Spectrum1D(
+                flux=flux * u.one,
+                spectral_axis=wvln * u.angstrom,
+                uncertainty=StdDevUncertainty(flux_err),
+                mask=mask)
+            spectra.append(s)
+
+        spectrum = combine_spectra(*spectra)
+
+        return clean_spectrum(spectrum, percentile_clip=percentile_clip)
+
+    def get_frame_spectra(self, percentile_clip=True):
         spectra = {}
-        for frame in flipped:
+        for frame in self.frame_hdulists:
             chip_spectra = []
-            for chip in flipped[frame]:
-                spec = get_frame_spectrum(
-                    flipped[frame][chip],
-                    self._apid,
-                    mask_flux=mask_flux,
-                    sigma_clip_flux=self.sigma_clip_flux)
-                chip_spectra.append(spec)
+            for chip in self.frame_hdulists[frame]:
+                hdul = self.frame_hdulists[frame][chip]
 
-            spectra[frame] = combine_spectra(*chip_spectra)
+                object_idx, = np.where(
+                    hdul[11].data['OBJECT'] == self['APOGEE_ID'])[0]
+
+                flux = hdul[1].data[object_idx]
+                flux_err = hdul[2].data[object_idx]
+                wvln = hdul[4].data[object_idx]
+                mask = ((hdul[3].data[object_idx] != 0) | (flux <= 0))
+
+                s = Spectrum1D(
+                    flux=flux * u.one,
+                    spectral_axis=wvln * u.angstrom,
+                    uncertainty=StdDevUncertainty(flux_err),
+                    mask=mask)
+                chip_spectra.append(s)
+
+            spectrum = combine_spectra(*chip_spectra)
+            spectra[frame] = clean_spectrum(spectrum,
+                                            percentile_clip=percentile_clip)
 
         return spectra
 

@@ -9,15 +9,13 @@ from collections import defaultdict
 from astropy.io import fits
 from astropy.nddata import StdDevUncertainty
 from astropy.stats import sigma_clip
-import astropy.units as u
 import numpy as np
 import requests
 from specutils import Spectrum1D
 
 # This project
-from .config import cache_path, sdss_auth
+from .config import dr, reduction, cache_path, sdss_auth
 from .log import logger
-from .utils import combine_spectra
 
 
 SAS_URL = "https://data.sdss.org/sas/"
@@ -32,7 +30,7 @@ def _authcheck():
 
 def get_apVisit(visit):
     _authcheck()
-    root_path = "apogeework/apogee/spectro/redux/dr16/visit/"
+    root_path = f"apogeework/apogee/spectro/redux/{dr}/visit/"
 
     if visit['TELESCOPE'] == 'apo25m':
         sorp = 'p'
@@ -45,7 +43,7 @@ def get_apVisit(visit):
                 f"{visit['FIELD'].strip()}/" +
                 f"{int(visit['PLATE']):04d}/" +
                 f"{int(visit['MJD']):05d}/")
-    filename = (f"a{sorp}Visit-r12-{int(visit['PLATE']):04d}-" +
+    filename = (f"a{sorp}Visit-{reduction}-{int(visit['PLATE']):04d}-" +
                 f"{int(visit['MJD']):05d}-" +
                 f"{int(visit['FIBERID']):03d}.fits")
     url = os.path.join(SAS_URL, root_path, sub_path, filename)
@@ -70,7 +68,7 @@ def get_apVisit(visit):
 
 def get_apCframes(visit):
     _authcheck()
-    root_path = "apogeework/apogee/spectro/redux/dr16/visit/"
+    root_path = f"apogeework/apogee/spectro/redux/{dr}/visit/"
 
     if visit['TELESCOPE'] == 'apo25m':
         sorp = 'p'
@@ -92,13 +90,15 @@ def get_apCframes(visit):
         return None
 
     hduls = defaultdict(dict)
-    for chip in ['a', 'b', 'c']:
-        for frame in frames:
+    for frame in frames:
+        for chip in ['a', 'b', 'c']:
             filename = f'a{sorp}Cframe-{chip}-{frame:08d}.fits'
 
             url = os.path.join(SAS_URL, root_path, sub_path, filename)
 
-            local_path = cache_path / visit['APOGEE_ID']
+            local_path = (cache_path /
+                          f"{int(visit['PLATE']):04d}" /
+                          f"{int(visit['MJD']):05d}/")
             local_path.mkdir(exist_ok=True, parents=True)
 
             local_file = local_path / filename
@@ -113,57 +113,58 @@ def get_apCframes(visit):
                 with open(local_file, 'wb') as f:
                     f.write(r.content)
 
-            hduls[chip][frame] = fits.open(local_file)
+            hduls[frame][chip] = fits.open(local_file)
 
     return hduls
 
 
-def get_visit_spectrum(hdul, sigma_clip_flux=True):
-    spectra = []
-    for i in range(3):  # chips a, b, c
-        flux = hdul[1].data[i]
-        mask = ((hdul[3].data[i] % 15) > 0) & (flux > 0)
+def aggro_percentile_clip(spectrum, poly_deg=5, clip_percentile=99, grow=2):
+    # initial pass to get rid of crazy outliers
+    init_flux = sigma_clip(spectrum.flux, sigma=5)
+    wvln = spectrum.wavelength.value
+    ivar = 1 / spectrum.uncertainty.quantity.value ** 2
 
-        if sigma_clip_flux:
-            flux = sigma_clip(flux, sigma=5, masked=True)
-            mask &= flux.mask
-
-        flux_err = hdul[2].data[i] * u.one
-        unc = StdDevUncertainty(flux_err)
-
-        s = Spectrum1D(
-            flux=flux[~mask]*u.one,
-            spectral_axis=hdul[4].data[i][~mask]*u.angstrom,
-            uncertainty=unc[~mask])
-
-        spectra.append(s)
-
-    spectrum = combine_spectra(*spectra)
-    return spectrum
-
-
-def get_frame_spectrum(hdul, apogee_id, mask_flux=True, sigma_clip_flux=True):
-    object_idx, = np.where(hdul[11].data['OBJECT'] == apogee_id)[0]
-
-    flux = hdul[1].data[object_idx]
-    flux_err = hdul[2].data[object_idx]
-    wvln = hdul[4].data[object_idx]
-    mask = ((hdul[3].data[object_idx] % 15) > 0) & (flux <= 0)
-
-    if sigma_clip_flux:
-        flux = sigma_clip(flux, sigma=3, masked=True)
-        mask &= flux.mask
-
-    if mask_flux:
-        unc = StdDevUncertainty(flux_err[~mask])
-        spectrum = Spectrum1D(flux=flux[~mask]*u.one,
-                              spectral_axis=wvln[~mask]*u.angstrom,
-                              uncertainty=unc)
+    if spectrum.mask is not None:
+        mask = spectrum.mask
     else:
-        unc = StdDevUncertainty(flux_err)
-        spectrum = Spectrum1D(flux=flux*u.one,
-                              spectral_axis=wvln*u.angstrom,
-                              uncertainty=unc,
-                              mask=mask)
+        mask = np.zeros(len(wvln))
+    mask |= init_flux.mask | (~np.isfinite(ivar)) | (ivar < 1e-14)
+
+    coeffs = np.polyfit(
+        wvln[~mask],
+        init_flux[~mask],
+        w=ivar[~mask],
+        deg=poly_deg)
+    continuum_poly = np.poly1d(coeffs)
+
+    diff = spectrum.flux.value - continuum_poly(wvln)
+    clip_mask = diff > np.percentile(diff[~mask], clip_percentile)
+
+    if grow > 0:
+        for shift in np.arange(-grow, grow+1):
+            clip_mask |= np.roll(clip_mask, shift=shift)
+
+    mask |= clip_mask
+
+    return Spectrum1D(
+        flux=spectrum.flux[~mask],
+        spectral_axis=spectrum.wavelength[~mask],
+        uncertainty=StdDevUncertainty(spectrum.uncertainty[~mask])), mask
+
+
+def clean_spectrum(spectrum, percentile_clip=None):
+
+    if percentile_clip is not False:
+        if percentile_clip in [True, None]:
+            kw = {}
+        else:
+            kw = dict(percentile_clip)
+
+        _, mask = aggro_percentile_clip(spectrum, **kw)
+        spectrum = Spectrum1D(
+            flux=spectrum.flux,
+            spectral_axis=spectrum.wavelength,
+            uncertainty=spectrum.uncertainty,
+            mask=mask)
 
     return spectrum
