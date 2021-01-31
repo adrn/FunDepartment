@@ -6,7 +6,7 @@ from specutils import Spectrum1D
 AA = u.angstrom
 
 
-def combine_spectra(*spectra):
+def combine_spectra(*spectra, sort=True):
 
     data = {
         'spectral_axis': [],
@@ -42,6 +42,13 @@ def combine_spectra(*spectra):
 
         if k == 'uncertainty':
             data[k] = StdDevUncertainty(data[k])
+
+    if sort:
+        idx = np.argsort(data['spectral_axis'])
+        for k in data:
+            if data[k] is None:
+                continue
+            data[k] = data[k][idx]
 
     return Spectrum1D(**data)
 

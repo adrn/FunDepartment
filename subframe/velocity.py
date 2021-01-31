@@ -115,21 +115,43 @@ def estimate_kernel(frame_spectrum, normed_ref_spectrum,
     return kernel, kernel_cov, vs
 
 
+def apogee_smooth_normalize(flux, sigma=100):
+    from astropy.convolution import (Gaussian1DKernel,
+                                     interpolate_replace_nans, convolve)
+    # astropy convolution
+    kernel = Gaussian1DKernel(sigma)
+    tmp = interpolate_replace_nans(flux, kernel, boundary='extend')
+    smooth_frame_flux = convolve(tmp, kernel, boundary='extend')
+    frame_flux_diff = flux - smooth_frame_flux
+    frame_flux_diff /= np.linalg.norm(frame_flux_diff)
+
+    return frame_flux_diff
+
+    # Chip-gap sensitive method...
+    # chip_gaps = [0, 1.583, 1.69, 2] * u.micron
+
+    # sections = []
+    # for l, r in zip(chip_gaps[:-1], chip_gaps[1:]):
+    #     wvln_mask = ((spectrum.wavelength > l) &
+    #                  (spectrum.wavelength <= r))
+    #     smooth_flux = gaussian_filter1d(spectrum.flux[wvln_mask], sigma=sigma)
+    #     flux_diff = spectrum.flux[wvln_mask] - smooth_flux
+    #     flux_diff /= np.linalg.norm(flux_diff)
+    #     sections.append(flux_diff)
+
+    # return np.concatenate(flux_diff)
+
+
 def bag_of_hacks_cross_correlate(frame_spectrum, normed_ref_spectrum,
                                  K_half=1, dv=8.*u.km/u.s, v0=0*u.km/u.s,
                                  smooth=100):
 
-    smooth_frame_flux = gaussian_filter1d(frame_spectrum.flux, sigma=smooth)
-    frame_flux_diff = frame_spectrum.flux - smooth_frame_flux
-    frame_flux_diff /= np.linalg.norm(frame_flux_diff)
+    frame_flux_diff = apogee_smooth_normalize(frame_spectrum.flux,
+                                              sigma=smooth)
 
     shifted_flux = shift_and_interpolate(normed_ref_spectrum,
                                          0,
                                          frame_spectrum.wavelength)
-
-    smooth_ref_flux = gaussian_filter1d(shifted_flux, sigma=smooth)
-    ref_flux_diff = shifted_flux - smooth_ref_flux
-    ref_flux_diff /= np.linalg.norm(ref_flux_diff)
 
     vs = np.arange(-K_half, K_half+1) * dv + v0
     terms = []
@@ -137,15 +159,11 @@ def bag_of_hacks_cross_correlate(frame_spectrum, normed_ref_spectrum,
         shifted_flux = shift_and_interpolate(normed_ref_spectrum,
                                              v,
                                              frame_spectrum.wavelength)
-
-        smooth_ref_flux = gaussian_filter1d(shifted_flux, sigma=smooth)
-        ref_flux_diff = shifted_flux - smooth_ref_flux
-        ref_flux_diff /= np.linalg.norm(ref_flux_diff)
-
+        ref_flux_diff = apogee_smooth_normalize(shifted_flux,
+                                                sigma=smooth)
         terms.append(ref_flux_diff)
 
     M = np.stack(terms).T
-
     cc = M.T @ frame_flux_diff
 
-    return cc, vs
+    return cc, vs, (frame_flux_diff, M)

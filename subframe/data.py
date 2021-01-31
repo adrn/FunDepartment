@@ -63,7 +63,15 @@ class Visit:
             self._frames_hdulist = get_apCframes(self._visit_row)
         return self._frames_hdulist
 
-    def get_spectrum(self, percentile_clip=True):
+    def get_spectrum(self, **kwargs):
+        """
+        Parameters
+        ----------
+        **kwargs
+            Passed to `clean_spectrum()`, like `percentile_clip=True` or
+            `grow=3`.
+        """
+
         hdul = self.hdulist
 
         spectra = []
@@ -80,11 +88,18 @@ class Visit:
                 mask=mask)
             spectra.append(s)
 
-        spectrum = combine_spectra(*spectra)
+        spectrum = combine_spectra(*spectra, sort=True)
 
-        return clean_spectrum(spectrum, percentile_clip=percentile_clip)
+        return clean_spectrum(spectrum, **kwargs)
 
-    def get_apStar_spectrum(self, percentile_clip=True):
+    def get_apStar_spectrum(self, **kwargs):
+        """
+        Parameters
+        ----------
+        **kwargs
+            Passed to `clean_spectrum()`, like `percentile_clip=True` or
+            `grow=3`.
+        """
         hdul = get_apStar(self)
 
         i = 0
@@ -101,9 +116,17 @@ class Visit:
             uncertainty=StdDevUncertainty(flux_err),
             mask=mask)
 
-        return clean_spectrum(s, percentile_clip=percentile_clip)
+        return clean_spectrum(s, **kwargs)
 
-    def get_frame_spectra(self, percentile_clip=True):
+    def get_frame_spectra(self, **kwargs):
+        """
+        Parameters
+        ----------
+        **kwargs
+            Passed to `clean_spectrum()`, like `percentile_clip=True` or
+            `grow=3`.
+        """
+
         spectra = {}
         for frame in self.frame_hdulists:
             chip_spectra = []
@@ -127,9 +150,8 @@ class Visit:
                     mask=mask)
                 chip_spectra.append(s)
 
-            spectrum = combine_spectra(*chip_spectra)
-            spectra[frame] = clean_spectrum(spectrum,
-                                            percentile_clip=percentile_clip)
+            spectrum = combine_spectra(*chip_spectra, sort=True)
+            spectra[frame] = clean_spectrum(spectrum, **kwargs)
 
         return spectra
 
