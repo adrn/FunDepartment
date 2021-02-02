@@ -58,7 +58,7 @@ def parabola_optimum(x, y):
     ctr_i = np.argmax(y)
     if ctr_i in [0, len(y)-1]:
         # FAILURE
-        return np.nan, None
+        return np.nan, None, None
 
     ps = np.polyfit(x[ctr_i-1:ctr_i+2],
                     y[ctr_i-1:ctr_i+2],
@@ -69,9 +69,9 @@ def parabola_optimum(x, y):
 
     if ps[0] > 0:
         # FAILURE
-        return np.nan, poly
+        return np.nan, poly, ctr_i
 
-    return x0, poly
+    return x0, poly, ctr_i
 
 
 def wavelength_chip_index(spectrum):
