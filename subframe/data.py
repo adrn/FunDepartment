@@ -13,7 +13,7 @@ from specutils import Spectrum1D
 
 # This project
 from .data_helpers import (get_apStar, get_apVisit, get_apCframes,
-                           clean_spectrum)
+                           clean_spectrum, get_aspcapStar)
 from .utils import combine_spectra
 
 
@@ -55,7 +55,13 @@ class Visit:
 
     @property
     def skycoord(self):
-        return coord.SkyCoord(self['RA'], self['DEC'], unit='deg')
+        # TEMP HACK:
+        if 'RA' not in self.colnames:
+            return coord.SkyCoord(self.hdulist[0].header['RA'],
+                                  self.hdulist[0].header['DEC'],
+                                  unit='deg')
+        else:
+            return coord.SkyCoord(self['RA'], self['DEC'], unit='deg')
 
     @property
     def frame_hdulists(self):
@@ -115,6 +121,32 @@ class Visit:
             spectral_axis=wvln * u.angstrom,
             uncertainty=StdDevUncertainty(flux_err),
             mask=mask)
+
+        return clean_spectrum(s, **kwargs)
+
+    def get_aspcapStar_spectrum(self, **kwargs):
+        """
+        Parameters
+        ----------
+        **kwargs
+            Passed to `clean_spectrum()`, like `percentile_clip=True` or
+            `grow=3`.
+        """
+        hdul = get_aspcapStar(self)
+
+        flux = hdul[1].data
+        flux_err = hdul[2].data * u.one
+        wvln = 10 ** (hdul[1].header['CRVAL1'] +
+                      np.arange(hdul[1].header['NAXIS1']) *
+                      hdul[1].header['CDELT1'])
+
+        flux[flux_err <= 0] = 1  # MAGIC NUMBER
+        flux_err[flux_err <= 0] = 1e1  # MAGIC NUMBER
+
+        s = Spectrum1D(
+            flux=flux * u.one,
+            spectral_axis=wvln * u.angstrom,
+            uncertainty=StdDevUncertainty(flux_err))
 
         return clean_spectrum(s, **kwargs)
 
