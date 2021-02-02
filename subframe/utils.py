@@ -54,14 +54,14 @@ def combine_spectra(*spectra, sort=True):
     return Spectrum1D(**data)
 
 
-def parabola_optimum(x, y):
+def parabola_optimum(x, y, fit_half_size=1):
     ctr_i = np.argmax(y)
     if ctr_i in [0, len(y)-1]:
         # FAILURE
         return np.nan, None, None
 
-    ps = np.polyfit(x[ctr_i-1:ctr_i+2],
-                    y[ctr_i-1:ctr_i+2],
+    ps = np.polyfit(x[ctr_i-fit_half_size:ctr_i+fit_half_size+1],
+                    y[ctr_i-fit_half_size:ctr_i+fit_half_size+1],
                     deg=2)
     poly = np.poly1d(ps)
 

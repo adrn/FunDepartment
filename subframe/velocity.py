@@ -9,7 +9,7 @@ from scipy.interpolate import InterpolatedUnivariateSpline
 from specutils import Spectrum1D
 
 # This project
-from .utils import WVLNU, wavelength_chip_index
+from .utils import WVLNU, wavelength_chip_index, parabola_optimum
 from .log import logger
 
 
@@ -149,7 +149,25 @@ def bag_of_hacks_cross_correlate(normed_frame_spectrum, template_spectrum,
                     ((frame_flux.T * Cinv) @ frame_flux))
     cc = ((M.T * Cinv) @ normed_frame_spectrum.flux) / denom
 
-    return cc, vs, M
+    return cc, vs, M, denom
+
+
+def estimate_rv(normed_spectrum, template_spectrum, visit,
+                poly_half_size=1, **kwargs):
+
+    # defaults
+    kwargs.setdefault('K_half', 7)
+    kwargs.setdefault('dv', 8*u.km/u.s)
+
+    cc, vs, M, denom = bag_of_hacks_cross_correlate(
+        normed_spectrum, template_spectrum,
+        v0=visit['VREL']*u.km/u.s, **kwargs)
+    cc_rv, cc_poly, cc_argmax_i = parabola_optimum(vs.value, cc,
+                                                   poly_half_size)
+
+    cc_rv_err = np.sqrt(-1 / (cc_poly.deriv(m=2)(cc_rv) * denom[cc_argmax_i]))
+
+    return [cc_rv, cc_rv_err] * u.km/u.s
 
 
 def estimate_kernel(frame_spectrum, normed_ref_spectrum,
