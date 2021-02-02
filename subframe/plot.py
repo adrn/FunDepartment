@@ -6,7 +6,7 @@ import numpy as np
 
 # This project
 from .config import plot_path
-from .utils import AA
+from .utils import AA, WVLNU
 from .data_helpers import apply_masks
 
 FRAME_COLOR = 'tab:purple'
@@ -14,32 +14,42 @@ VISIT_COLOR = 'k'
 SPEC_STYLE = dict(marker='', ls='-', lw=1, drawstyle='steps-mid')
 
 
-def plot_spectrum_masked(spectrum):
-    fig, ax = plt.subplots(1, 1, figsize=(12, 4))
+def plot_spectrum(spectrum, ax=None, masked=True):
+    if ax is None:
+        fig, ax = plt.subplots(1, 1, figsize=(12, 4))
+    else:
+        fig = ax.figure
 
-    wvln = spectrum.wavelength.to_value(AA)
+    wvln = spectrum.wavelength.to_value(WVLNU)
     flux = spectrum.flux.value
 
-    ax.plot(wvln[~spectrum.mask],
-            flux[~spectrum.mask],
-            **SPEC_STYLE)
+    if masked or spectrum.mask is not None:
+        ax.plot(wvln[~spectrum.mask],
+                flux[~spectrum.mask],
+                **SPEC_STYLE)
 
-    ax.plot(wvln[spectrum.mask],
-            flux[spectrum.mask],
-            marker='o', mew=0, ms=2., ls='none',
-            color='tab:red', alpha=0.75, zorder=-10)
+        ax.plot(wvln[spectrum.mask],
+                flux[spectrum.mask],
+                marker='o', mew=0, ms=2., ls='none',
+                color='tab:red', alpha=0.75, zorder=-10)
+        fmin, fmax = (np.nanmin(flux[~spectrum.mask]),
+                      np.nanmax(flux[~spectrum.mask]))
+    else:
+        ax.plot(wvln,
+                flux,
+                **SPEC_STYLE)
+        fmin, fmax = (np.nanmin(flux),
+                      np.nanmax(flux))
 
     ax.set_xlim(wvln.min(), wvln.max())
 
-    fmin, fmax = (np.nanmin(flux[~spectrum.mask]),
-                  np.nanmax(flux[~spectrum.mask]))
     ptp = fmax - fmin
     ax.set_ylim(fmin - 0.2*ptp, fmax + 0.2*ptp)
 
-    ax.set_xlabel(f'wavelength [{AA:latex_inline}]')
+    ax.set_xlabel(f'wavelength [{WVLNU:latex_inline}]')
     ax.set_ylabel('flux')
 
-    return fig
+    return fig, ax
 
 
 def plot_visit_frames(visit, masked=True, **kwargs):
