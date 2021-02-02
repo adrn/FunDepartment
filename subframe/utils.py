@@ -4,6 +4,7 @@ import astropy.units as u
 from specutils import Spectrum1D
 
 AA = u.angstrom
+WVLNU = u.micron
 
 
 def combine_spectra(*spectra, sort=True):
@@ -71,3 +72,17 @@ def parabola_optimum(x, y):
         return np.nan, poly
 
     return x0, poly
+
+
+def wavelength_chip_index(spectrum):
+    """
+    Note: This isn't always *exactly* correct because of rest-frame bullshit
+    """
+    chip_gaps = [0, 1.583, 1.69, 2] * u.micron
+
+    ids = np.zeros(spectrum.shape[0], dtype=int)
+    for i, (l, r) in enumerate(zip(chip_gaps[:-1], chip_gaps[1:])):
+        ids[(spectrum.wavelength > l) &
+            (spectrum.wavelength <= r)] = i
+
+    return ids

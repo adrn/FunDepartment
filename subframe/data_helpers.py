@@ -31,7 +31,12 @@ def _authcheck():
 
 def get_apStar(visit):
     _authcheck()
-    root_path = f"apogeework/apogee/spectro/redux/{dr}/stars/"
+    if dr == 'dr17alpha':
+        stars = 'stars.0.17.12'
+    else:
+        stars = 'stars'
+
+    root_path = f"apogeework/apogee/spectro/redux/{dr}/{stars}/"
 
     if visit['TELESCOPE'] == 'apo25m':
         sorp = 'p'
@@ -43,6 +48,33 @@ def get_apStar(visit):
     sub_path = (f"{visit['TELESCOPE']}/" +
                 f"{visit['FIELD'].strip()}/")
     filename = f"a{sorp}Star-{reduction}-{visit['APOGEE_ID'].strip()}.fits"
+    url = os.path.join(SAS_URL, root_path, sub_path, filename)
+
+    local_path = cache_path / visit['APOGEE_ID']
+    local_path.mkdir(exist_ok=True, parents=True)
+
+    local_file = local_path / filename
+    if not local_file.exists():
+        logger.debug(f"downloading {url} ...")
+        r = requests.get(url, auth=sdss_auth)
+
+        if not r.ok:
+            raise RuntimeError(f"Failed to download file from {url}: {r}")
+
+        with open(local_file, 'wb') as f:
+            f.write(r.content)
+
+    hdul = fits.open(local_file)
+    return hdul
+
+
+def get_aspcapStar(visit):
+    _authcheck()
+
+    root_path = f"apogeework/apogee/spectro/aspcap/{dr}/l33/"
+    sub_path = (f"{visit['TELESCOPE']}/" +
+                f"{visit['FIELD'].strip()}/")
+    filename = f"aspcapStar-{reduction}-{visit['APOGEE_ID'].strip()}.fits"
     url = os.path.join(SAS_URL, root_path, sub_path, filename)
 
     local_path = cache_path / visit['APOGEE_ID']
