@@ -130,6 +130,28 @@ def cross_correlate(frame_spectrum, normed_ref_spectrum,
     return crosscorr, vs
 
 
+def bag_of_hacks_cross_correlate(normed_frame_spectrum, template_spectrum,
+                                 K_half=5, dv=8.*u.km/u.s, v0=0*u.km/u.s):
+
+    vs = np.arange(-K_half, K_half+1) * dv + v0
+    terms = []
+    for dv in vs:
+        shifted_template = shift_and_interpolate(
+            template_spectrum, dv, normed_frame_spectrum)
+        terms.append(shifted_template.flux.value)
+
+    M = np.stack(terms).T
+
+    Cinv = 1 / normed_frame_spectrum.uncertainty.array ** 2
+
+    frame_flux = normed_frame_spectrum.flux
+    denom = np.sqrt(np.diag((M.T * Cinv) @ M) *
+                    ((frame_flux.T * Cinv) @ frame_flux))
+    cc = ((M.T * Cinv) @ normed_frame_spectrum.flux) / denom
+
+    return cc, vs, M
+
+
 def estimate_kernel(frame_spectrum, normed_ref_spectrum,
                     K_half=2, dv=8.*u.km/u.s, clip_mask=None):
 
@@ -154,26 +176,3 @@ def estimate_kernel(frame_spectrum, normed_ref_spectrum,
     kernel_cov = np.linalg.inv((M.T * Cinv) @ M)
 
     return kernel, kernel_cov, vs
-
-
-def bag_of_hacks_cross_correlate(normed_frame_spectrum, template_spectrum,
-                                 K_half=5, dv=8.*u.km/u.s, v0=0*u.km/u.s):
-
-    vs = np.arange(-K_half, K_half+1) * dv + v0
-    terms = []
-    for dv in vs:
-        shifted_template = shift_and_interpolate(
-            template_spectrum, dv, normed_frame_spectrum)
-        terms.append(shifted_template.flux.value)
-
-    M = np.stack(terms).T
-
-    Cinv = 1 / normed_frame_spectrum.uncertainty.array ** 2
-
-    frame_flux = normed_frame_spectrum.flux
-    denom = np.sqrt(np.diag((M.T * Cinv) @ M) *
-                    ((frame_flux.T * Cinv) @ frame_flux))
-    cc = ((M.T * Cinv) @ normed_frame_spectrum.flux) / denom
-
-    return cc, vs, M
-
